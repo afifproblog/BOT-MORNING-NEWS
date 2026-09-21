@@ -10,26 +10,49 @@ WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
 
 def get_coal_price():
-  """Tarik harga Newcastle Coal resmi dari TradingEconomics"""
+  """Tarik harga Newcastle Coal resmi via endpoint publik Markets Insider"""
   try:
     headers = {
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         )
     }
-    url = "https://markets.tradingeconomics.com/chart?s=co1:com&interval=1d&span=5d"
+    url = "https://markets.businessinsider.com/Ajax/Chart_GetChartData?instrumentType=Commodity&tkData=300002,1,0,333"
     res = requests.get(url, headers=headers, timeout=10).json()
-    series = res.get("series", [])[0].get("data", [])
-    if len(series) >= 2:
-      close_today = float(series[-1]["y"])
-      close_prev = float(series[-2]["y"])
+
+    if res and len(res) >= 2:
+      close_today = float(res[-1]["Close"])
+      close_prev = float(res[-2]["Close"])
       change_pct = ((close_today - close_prev) / close_prev) * 100
       sign = "+" if change_pct >= 0 else ""
       return f"`COAL      ` : **${close_today:.2f}** ({sign}{change_pct:.2f}%)"
   except Exception:
     pass
-  return None
 
+  # Fallback: jika endpoint di atas sibuk, ambil via proxy API Stooq
+  try:
+    url_stooq = "https://stooq.com/q/l/?s=co.c&f=sd2t2ohlcv&h&e=csv"
+    res_stooq = requests.get(
+        url_stooq,
+        headers={"User-Agent": "Mozilla/5.0"},
+        timeout=10,
+    ).text.strip()
+    rows = res_stooq.split("\n")
+    if len(rows) >= 2:
+      cols = rows[1].split(",")
+      close_today = float(cols[5])
+      open_today = float(cols[2])
+      change_pct = (
+          ((close_today - open_today) / open_today) * 100
+          if open_today
+          else 0.0
+      )
+      sign = "+" if change_pct >= 0 else ""
+      return f"`COAL      ` : **${close_today:.2f}** ({sign}{change_pct:.2f}%)"
+  except Exception:
+    pass
+
+  return None
 
 def get_macro_data():
   """Tarik komoditas & makro ala Stockbit"""
