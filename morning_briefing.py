@@ -8,12 +8,41 @@ import yfinance as yf
 load_dotenv()
 WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
-#SAHAM DATA
+
+def get_coal_price():
+  """Tarik harga Newcastle Coal resmi dari TradingEconomics"""
+  try:
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        )
+    }
+    url = "https://markets.tradingeconomics.com/chart?s=co1:com&interval=1d&span=5d"
+    res = requests.get(url, headers=headers, timeout=10).json()
+    series = res.get("series", [])[0].get("data", [])
+    if len(series) >= 2:
+      close_today = float(series[-1]["y"])
+      close_prev = float(series[-2]["y"])
+      change_pct = ((close_today - close_prev) / close_prev) * 100
+      sign = "+" if change_pct >= 0 else ""
+      return f"`COAL      ` : **${close_today:.2f}** ({sign}{change_pct:.2f}%)"
+  except Exception:
+    pass
+  return None
+
+
 def get_macro_data():
-  """Tarik komoditas & makro (Termasuk Coal & Palm Oil Proxy yang aktif di Yahoo Finance)"""
+  """Tarik komoditas & makro ala Stockbit"""
+  lines = []
+
+  # 1. Masukkan COAL (Newcastle) di posisi paling atas
+  coal_line = get_coal_price()
+  if coal_line:
+    lines.append(coal_line)
+
+  # 2. Komoditas lainnya via yfinance
   items = [
-      ("COAL", "KOL", "$"),  # Global Coal Benchmark Index
-      ("CPO/PALM", "ZL=F", "USc/lb"),  # Global Vegetable Oil Futures Benchmark
+      ("CPO/PALM", "ZL=F", "USc/lb"),
       ("BRENT", "BZ=F", "$"),
       ("OIL (WTI)", "CL=F", "$"),
       ("GOLD", "GC=F", "$"),
@@ -23,12 +52,10 @@ def get_macro_data():
       ("USD/IDR", "USDIDR=X", "Rp"),
   ]
 
-  lines = []
   for label, sym, curr in items:
     try:
       df = yf.download(sym, period="5d", interval="1d", progress=False)
       if len(df) >= 2:
-        # Bersihkan Series agar tidak memicu FutureWarning Pandas
         close_series = df["Close"].dropna().values.flatten()
         if len(close_series) >= 2:
           close_today = float(close_series[-1])
@@ -50,7 +77,8 @@ def get_macro_data():
   return (
       "\n".join(lines) if lines else "• Data komoditas belum dapat dimuat."
   )
-#CRYPTO DATA
+
+
 def get_crypto_data():
   """Tarik harga BTC, ETH, dan Top 3 Trending Coins lengkap dengan % 24h"""
   lines = []
@@ -85,7 +113,6 @@ def get_crypto_data():
       data = item.get("data", {})
 
       price = data.get("price", 0)
-      # Format harga (jika sangat kecil atau desimal standar)
       if isinstance(price, (int, float)):
         price_str = f"${price:,.4f}" if price < 1 else f"${price:,.2f}"
       else:
@@ -95,7 +122,6 @@ def get_crypto_data():
           data.get("price_change_percentage_24h", {}).get("usd", 0) or 0
       )
       sign_t = "+" if change_24h >= 0 else ""
-
       lines.append(
           f"• **{symbol:<6}** : {price_str} ({sign_t}{change_24h:.2f}%)"
       )
@@ -104,7 +130,7 @@ def get_crypto_data():
 
   return "\n".join(lines)
 
-#NEWS
+
 def get_trending_news():
   """Tarik 3 berita terhangat/viral terkini"""
   feeds = [
@@ -147,7 +173,7 @@ def send_discord():
   embed = {
       "title": "🌅 MORNING DIGEST & MARKET RADAR",
       "description": f"Update ringkasan pasar & isu terkini ({now_str} WIB)\n",
-      "color": 0x2ECC71,  # Hijau bursa segar
+      "color": 0x2ECC71,
       "fields": [
           {
               "name": "📊 COMMODITIES & CURRENCY",
@@ -163,7 +189,7 @@ def send_discord():
       ],
       "footer": {
           "text": "Daily Market Intelligence • Automated by PM2",
-          "icon_url": "https://assets.stickpng.com/images/5842f1f0a6515b1e0ad75b11.png",  # Ikon grafik bursa
+          "icon_url": "https://assets.stickpng.com/images/5842f1f0a6515b1e0ad75b11.png",
       },
   }
 
