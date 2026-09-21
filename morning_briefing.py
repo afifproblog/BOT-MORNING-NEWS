@@ -5,23 +5,25 @@ from dotenv import load_dotenv
 import requests
 import yfinance as yf
 
-# Load file .env (menggunakan DISCORD_WEBHOOK_URL yang sudah ada)
 load_dotenv()
 WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
 
 def get_macro_data():
-  """Tarik data komoditas dan kurs via yfinance"""
-  tickers = {
-      "Minyak (WTI)": "CL=F",
-      "Minyak (Brent)": "BZ=F",
-      "Emas Dunia": "GC=F",
-      "Gas Alam": "NG=F",
-      "USD/IDR": "USDIDR=X",
-  }
+  """Tarik komoditas & makro dengan style clean ala Stockbit"""
+  # Ticker yfinance: BRENT, WTI (OIL), GOLD (GC=F), SILVER (SI=F), COPPER (HG=F), GAS (NG=F), USD/IDR
+  items = [
+      ("BRENT", "BZ=F", "$"),
+      ("OIL (WTI)", "CL=F", "$"),
+      ("GOLD", "GC=F", "$"),
+      ("SILVER", "SI=F", "$"),
+      ("COPPER", "HG=F", "$"),
+      ("GAS", "NG=F", "$"),
+      ("USD/IDR", "USDIDR=X", "Rp"),
+  ]
 
   lines = []
-  for label, sym in tickers.items():
+  for label, sym, curr in items:
     try:
       df = yf.download(sym, period="5d", interval="1d", progress=False)
       if len(df) >= 2:
@@ -30,57 +32,76 @@ def get_macro_data():
         change_pct = ((close_today - close_prev) / close_prev) * 100
 
         sign = "+" if change_pct >= 0 else ""
-        if sym == "USDIDR=X":
+        if curr == "Rp":
           val_str = f"Rp{close_today:,.0f}"
         else:
           val_str = f"${close_today:,.2f}"
 
-        lines.append(
-            f"• **{label:<14}**: `{val_str}` ({sign}{change_pct:.2f}%)"
-        )
-    except Exception as e:
+        lines.append(f"`{label:<10}` : **{val_str}** ({sign}{change_pct:.2f}%)")
+    except Exception:
       continue
+
   return (
       "\n".join(lines) if lines else "• Data komoditas belum dapat dimuat."
   )
 
 
 def get_crypto_data():
-  """Tarik harga BTC, ETH, dan trending coin via API publik CoinGecko"""
+  """Tarik harga BTC, ETH, dan Top 3 Trending Coins lengkap dengan % 24h"""
   lines = []
   try:
-    url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true"
-    res = requests.get(url, timeout=10).json()
+    headers = {"accept": "application/json", "User-Agent": "Mozilla/5.0"}
 
-    btc_p = res.get("bitcoin", {}).get("usd", 0)
-    btc_c = res.get("bitcoin", {}).get("usd_24h_change", 0)
+    # 1. Tarik BTC & ETH
+    url_p = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum&vs_currencies=usd&include_24hr_change=true"
+    res_p = requests.get(url_p, headers=headers, timeout=10).json()
+
+    btc_p = res_p.get("bitcoin", {}).get("usd", 0)
+    btc_c = res_p.get("bitcoin", {}).get("usd_24h_change", 0)
     sign_btc = "+" if btc_c >= 0 else ""
     lines.append(
-        f"• **Bitcoin (BTC)**  : `${btc_p:,.0f}` ({sign_btc}{btc_c:.2f}%)"
+        f"`BTC       ` : **${btc_p:,.0f}** ({sign_btc}{btc_c:.2f}%)"
     )
 
-    eth_p = res.get("ethereum", {}).get("usd", 0)
-    eth_c = res.get("ethereum", {}).get("usd_24h_change", 0)
+    eth_p = res_p.get("ethereum", {}).get("usd", 0)
+    eth_c = res_p.get("ethereum", {}).get("usd_24h_change", 0)
     sign_eth = "+" if eth_c >= 0 else ""
-    lines.append(
-        f"• **Ethereum (ETH)** : `${eth_p:,.0f}` ({sign_eth}{eth_c:.2f}%)"
-    )
+    lines.append(f"`ETH       ` : **${eth_p:,.0f}** ({sign_eth}{eth_c:.2f}%)")
 
-    # Ambil 1 trending coin nomor 1 hari ini
-    trend_url = "https://api.coingecko.com/api/v3/search/trending"
-    trend_res = requests.get(trend_url, timeout=10).json()
-    top_coin = trend_res.get("coins", [])[0]["item"]
-    symbol = top_coin.get("symbol", "").upper()
-    price_btc = top_coin.get("price_btc", 0)
-    lines.append(f"• **Trending Alt**   : **{symbol}** (Rank #{top_coin.get('market_cap_rank', '-')})")
-  except Exception as e:
+    # 2. Tarik Top 3 Trending Coins
+    url_t = "https://api.coingecko.com/api/v3/search/trending"
+    res_t = requests.get(url_t, headers=headers, timeout=10).json()
+    trending_coins = res_t.get("coins", [])[:3]
+
+    lines.append("\n**Trending Searches (24h):**")
+    for coin_obj in trending_coins:
+      item = coin_obj.get("item", {})
+      symbol = item.get("symbol", "").upper()
+      data = item.get("data", {})
+
+      price = data.get("price", 0)
+      # Format harga (jika sangat kecil atau desimal standar)
+      if isinstance(price, (int, float)):
+        price_str = f"${price:,.4f}" if price < 1 else f"${price:,.2f}"
+      else:
+        price_str = str(price)
+
+      change_24h = (
+          data.get("price_change_percentage_24h", {}).get("usd", 0) or 0
+      )
+      sign_t = "+" if change_24h >= 0 else ""
+
+      lines.append(
+          f"• **{symbol:<6}** : {price_str} ({sign_t}{change_24h:.2f}%)"
+      )
+  except Exception:
     lines.append("• Data pasar kripto sementara belum tersedia.")
 
   return "\n".join(lines)
 
 
 def get_trending_news():
-  """Tarik 3 berita terhangat/terpopuler dari RSS feed nasional"""
+  """Tarik 3 berita terhangat/viral terkini"""
   feeds = [
       "https://www.antaranews.com/rss/terkini.xml",
       "https://www.cnnindonesia.com/nasional/rss",
@@ -120,26 +141,24 @@ def send_discord():
 
   embed = {
       "title": "🌅 MORNING DIGEST & MARKET RADAR",
-      "description": (
-          f"Update ringkasan pasar dan berita terkini ({now_str} WIB)\n"
-      ),
-      "color": 0xF39C12,  # Warna oranye keemasan
+      "description": f"Update ringkasan pasar & isu terkini ({now_str} WIB)\n",
+      "color": 0x2ECC71,  # Hijau bursa segar
       "fields": [
           {
-              "name": "🛢️ KOMODITAS & MAKRO",
+              "name": "📊 COMMODITIES & CURRENCY",
               "value": macro_section,
               "inline": False,
           },
-          {"name": "🪙 PASAR KRIPTO", "value": crypto_section, "inline": False},
+          {"name": "🪙 CRYPTO MARKET", "value": crypto_section, "inline": False},
           {
-              "name": "🔥 3 BERITA TRENDING HARI INI",
+              "name": "🔥 3 BERITA VIRAL & TERHANGAT",
               "value": news_section,
               "inline": False,
           },
       ],
       "footer": {
-          "text": "Daily Morning Intelligence • Automated by PM2",
-          "icon_url": "https://cdn-icons-png.flaticon.com/512/330/330430.png",
+          "text": "Daily Market Intelligence • Automated by PM2",
+          "icon_url": "https://assets.stickpng.com/images/5842f1f0a6515b1e0ad75b11.png",  # Ikon grafik bursa
       },
   }
 
@@ -147,7 +166,7 @@ def send_discord():
   res = requests.post(WEBHOOK_URL, json=payload)
 
   if res.status_code in [200, 204]:
-    print("Morning briefing berhasil terkirim ke Discord!")
+    print("Morning briefing berhasil terkirim!")
   else:
     print(f"Gagal mengirim: {res.status_code} - {res.text}")
 
