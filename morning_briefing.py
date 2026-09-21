@@ -167,7 +167,7 @@ def send_discord():
 
   embed = {
       "title": "🌅 MORNING DIGEST & MARKET RADAR",
-      "description": f"Update ringkasan pasar & isu terkini ({now_str} WIB)\n",
+      "description": f"Update ringkasan market & berita terkini ({now_str} WIB)\n",
       "color": 0x2ECC71,
       "fields": [
           {
@@ -177,7 +177,7 @@ def send_discord():
           },
           {"name": "🪙 CRYPTO MARKET", "value": crypto_section, "inline": False},
           {
-              "name": "🔥 5 BERITA VIRAL & TERHANGAT",
+              "name": "🔥 5 BERITA TRENDING TERHANGAT",
               "value": news_section,
               "inline": False,
           },
