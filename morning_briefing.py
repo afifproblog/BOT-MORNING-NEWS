@@ -8,11 +8,13 @@ import yfinance as yf
 load_dotenv()
 WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
-
+#SAHAM DATA
 def get_macro_data():
   """Tarik komoditas & makro dengan style clean ala Stockbit"""
-  # Ticker yfinance: BRENT, WTI (OIL), GOLD (GC=F), SILVER (SI=F), COPPER (HG=F), GAS (NG=F), USD/IDR
+  # Format: (Nama Label, Simbol Ticker yfinance, Simbol Mata Uang)
   items = [
+      ("COAL", "NCF=F", "$"),  # Newcastle Coal Futures
+      ("CPO", "FCPO.MD", "MYR/t"),  # Crude Palm Oil MDEX
       ("BRENT", "BZ=F", "$"),
       ("OIL (WTI)", "CL=F", "$"),
       ("GOLD", "GC=F", "$"),
@@ -34,6 +36,8 @@ def get_macro_data():
         sign = "+" if change_pct >= 0 else ""
         if curr == "Rp":
           val_str = f"Rp{close_today:,.0f}"
+        elif curr == "MYR/t":
+          val_str = f"RM{close_today:,.0f}"
         else:
           val_str = f"${close_today:,.2f}"
 
@@ -44,8 +48,7 @@ def get_macro_data():
   return (
       "\n".join(lines) if lines else "• Data komoditas belum dapat dimuat."
   )
-
-
+#CRYPTO DATA
 def get_crypto_data():
   """Tarik harga BTC, ETH, dan Top 3 Trending Coins lengkap dengan % 24h"""
   lines = []
@@ -99,7 +102,7 @@ def get_crypto_data():
 
   return "\n".join(lines)
 
-
+#NEWS
 def get_trending_news():
   """Tarik 3 berita terhangat/viral terkini"""
   feeds = [
