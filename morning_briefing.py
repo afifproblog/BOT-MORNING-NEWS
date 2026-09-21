@@ -10,11 +10,10 @@ WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
 #SAHAM DATA
 def get_macro_data():
-  """Tarik komoditas & makro dengan style clean ala Stockbit"""
-  # Format: (Nama Label, Simbol Ticker yfinance, Simbol Mata Uang)
+  """Tarik komoditas & makro (Termasuk Coal & Palm Oil Proxy yang aktif di Yahoo Finance)"""
   items = [
-      ("COAL", "NCF=F", "$"),  # Newcastle Coal Futures
-      ("CPO", "FCPO.MD", "MYR/t"),  # Crude Palm Oil MDEX
+      ("COAL", "KOL", "$"),  # Global Coal Benchmark Index
+      ("CPO/PALM", "ZL=F", "USc/lb"),  # Global Vegetable Oil Futures Benchmark
       ("BRENT", "BZ=F", "$"),
       ("OIL (WTI)", "CL=F", "$"),
       ("GOLD", "GC=F", "$"),
@@ -29,19 +28,22 @@ def get_macro_data():
     try:
       df = yf.download(sym, period="5d", interval="1d", progress=False)
       if len(df) >= 2:
-        close_today = float(df["Close"].iloc[-1])
-        close_prev = float(df["Close"].iloc[-2])
-        change_pct = ((close_today - close_prev) / close_prev) * 100
+        # Bersihkan Series agar tidak memicu FutureWarning Pandas
+        close_series = df["Close"].dropna().values.flatten()
+        if len(close_series) >= 2:
+          close_today = float(close_series[-1])
+          close_prev = float(close_series[-2])
+          change_pct = ((close_today - close_prev) / close_prev) * 100
 
-        sign = "+" if change_pct >= 0 else ""
-        if curr == "Rp":
-          val_str = f"Rp{close_today:,.0f}"
-        elif curr == "MYR/t":
-          val_str = f"RM{close_today:,.0f}"
-        else:
-          val_str = f"${close_today:,.2f}"
+          sign = "+" if change_pct >= 0 else ""
+          if curr == "Rp":
+            val_str = f"Rp{close_today:,.0f}"
+          elif curr == "USc/lb":
+            val_str = f"{close_today:.2f}¢"
+          else:
+            val_str = f"${close_today:,.2f}"
 
-        lines.append(f"`{label:<10}` : **{val_str}** ({sign}{change_pct:.2f}%)")
+          lines.append(f"`{label:<10}` : **{val_str}** ({sign}{change_pct:.2f}%)")
     except Exception:
       continue
 
