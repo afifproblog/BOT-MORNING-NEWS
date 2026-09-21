@@ -10,26 +10,27 @@ WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
 
 def get_coal_price():
-    """Tarik proxy batu bara global via yfinance (Peabody Energy - Raksasa Coal Dunia)"""
-    try:
-        df = yf.download("BTU", period="5d", interval="1d", progress=False)
-        if len(df) >= 2:
-            close_series = df["Close"].dropna().values.flatten()
-            if len(close_series) >= 2:
-                close_today = float(close_series[-1])
-                close_prev = float(close_series[-2])
-                change_pct = ((close_today - close_prev) / close_prev) * 100
-                sign = "+" if change_pct >= 0 else ""
-                return f"`COAL (BTU)` : **${close_today:.2f}** ({sign}{change_pct:.2f}%)"
-    except Exception:
-        pass
-    return None
+  """Tarik proxy batu bara global via yfinance (Peabody Energy - Raksasa Coal Dunia)"""
+  try:
+    df = yf.download("BTU", period="5d", interval="1d", progress=False)
+    if len(df) >= 2:
+      close_series = df["Close"].dropna().values.flatten()
+      if len(close_series) >= 2:
+        close_today = float(close_series[-1])
+        close_prev = float(close_series[-2])
+        change_pct = ((close_today - close_prev) / close_prev) * 100
+        sign = "+" if change_pct >= 0 else ""
+        return f"`COAL (BTU)` : **${close_today:.2f}** ({sign}{change_pct:.2f}%)"
+  except Exception:
+    pass
+  return None
+
 
 def get_macro_data():
   """Tarik komoditas & makro ala Stockbit"""
   lines = []
 
-  # 1. Masukkan COAL (Newcastle) di posisi paling atas
+  # 1. Masukkan COAL (Peabody Energy Proxy) di posisi paling atas
   coal_line = get_coal_price()
   if coal_line:
     lines.append(coal_line)
@@ -126,7 +127,7 @@ def get_crypto_data():
 
 
 def get_trending_news():
-  """Tarik 3 berita terhangat/viral terkini"""
+  """Tarik 5 berita terhangat/viral terkini"""
   feeds = [
       "https://www.antaranews.com/rss/terkini.xml",
       "https://www.cnnindonesia.com/nasional/rss",
@@ -140,16 +141,16 @@ def get_trending_news():
       link = entry.link.strip()
       if title and link and not any(item["link"] == link for item in news_list):
         news_list.append({"title": title, "link": link})
-      if len(news_list) >= 3:
+      if len(news_list) >= 5:
         break
-    if len(news_list) >= 3:
+    if len(news_list) >= 5:
       break
 
   if not news_list:
     return "• Berita terkini belum dapat dimuat."
 
   lines = []
-  for idx, item in enumerate(news_list[:3], 1):
+  for idx, item in enumerate(news_list[:5], 1):
     lines.append(f"{idx}. [{item['title']}]({item['link']})")
   return "\n\n".join(lines)
 
@@ -176,7 +177,7 @@ def send_discord():
           },
           {"name": "🪙 CRYPTO MARKET", "value": crypto_section, "inline": False},
           {
-              "name": "🔥 3 BERITA VIRAL & TERHANGAT",
+              "name": "🔥 5 BERITA VIRAL & TERHANGAT",
               "value": news_section,
               "inline": False,
           },
